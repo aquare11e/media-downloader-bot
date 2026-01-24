@@ -21,6 +21,7 @@ type Service struct {
 	plexClient           plex.PlexServiceClient
 	redisClient          *redis.Client
 	pbTypeToDownloadPath map[common.RequestType]string
+	rutrackerClient      *RutrackerClient
 }
 
 func NewService(transmissionConn, plexConn *grpc.ClientConn, redisClient *redis.Client, pbTypeToDownloadPath map[common.RequestType]string) *Service {
@@ -29,6 +30,7 @@ func NewService(transmissionConn, plexConn *grpc.ClientConn, redisClient *redis.
 		plexClient:           plex.NewPlexServiceClient(plexConn),
 		redisClient:          redisClient,
 		pbTypeToDownloadPath: pbTypeToDownloadPath,
+		rutrackerClient:      NewRutrackerClient(),
 	}
 }
 
@@ -51,6 +53,28 @@ func (s *Service) AddTorrentByFile(ctx context.Context, req *coordinatorpb.AddTo
 	return s.executeWithLogging(ctx, req.RequestId, req.Category, func() (*transmission.AddTorrentResponse, error) {
 		return s.transmissionClient.AddTorrentByFile(ctx, &transmission.AddTorrentByFileRequest{
 			Base64File: req.Base64File,
+			Filedir:    s.pbTypeToDownloadPath[req.Category],
+			RequestId:  req.RequestId,
+			Category:   req.Category.String(),
+		})
+	})
+}
+
+func (s *Service) AddTorrentByRutrackerURL(ctx context.Context, req *coordinatorpb.AddTorrentByRutrackerURLRequest) (*coordinatorpb.DownloadResponse, error) {
+	log.Printf("Adding torrent by Rutracker URL (requestID: %s, category: %s, url: %s)", req.RequestId, req.Category, req.RutrackerUrl)
+
+	// Fetch magnet link from rutracker page
+	magnetLink, err := s.rutrackerClient.GetMagnetLink(req.RutrackerUrl)
+	if err != nil {
+		log.Printf("Failed to get magnet link from rutracker (requestID: %s): %v", req.RequestId, err)
+		return nil, status.Errorf(codes.Internal, "failed to get magnet link from rutracker: %v", err)
+	}
+
+	log.Printf("Extracted magnet link from rutracker (requestID: %s)", req.RequestId)
+
+	return s.executeWithLogging(ctx, req.RequestId, req.Category, func() (*transmission.AddTorrentResponse, error) {
+		return s.transmissionClient.AddTorrentByMagnet(ctx, &transmission.AddTorrentByMagnetRequest{
+			MagnetLink: magnetLink,
 			Filedir:    s.pbTypeToDownloadPath[req.Category],
 			RequestId:  req.RequestId,
 			Category:   req.Category.String(),

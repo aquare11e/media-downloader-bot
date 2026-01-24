@@ -21,9 +21,18 @@ const (
 	StepDownloading
 )
 
+type LinkType int
+
+const (
+	LinkTypeMagnet LinkType = iota + 1
+	LinkTypeTorrentFile
+	LinkTypeRutracker
+)
+
 type downloadState struct {
 	step     Step
 	link     string
+	linkType LinkType
 	category common.RequestType
 }
 
@@ -44,7 +53,7 @@ func (df *DownloadFlow) Start(chatID int64) {
 		step: StepWaitingForLink,
 	}
 
-	response := tgbotapi.NewMessage(chatID, "✨ Awesome! Please send me a magnet link or torrent file to begin your download journey!")
+	response := tgbotapi.NewMessage(chatID, "✨ Awesome! Please send me a magnet link, torrent file, or Rutracker URL to begin your download journey!")
 	df.bot.api.Send(response)
 }
 
@@ -68,6 +77,16 @@ func (df *DownloadFlow) handleWaitingForLinkStep(msg *tgbotapi.Message, state *d
 	// Check if it's a magnet link
 	if strings.HasPrefix(msg.Text, "magnet:?xt=urn:btih:") {
 		state.link = msg.Text
+		state.linkType = LinkTypeMagnet
+		state.step = StepWaitingForCategory
+		df.sendCategoryButtons(msg.Chat.ID)
+		return
+	}
+
+	// Check if it's a Rutracker URL
+	if isRutrackerURL(msg.Text) {
+		state.link = msg.Text
+		state.linkType = LinkTypeRutracker
 		state.step = StepWaitingForCategory
 		df.sendCategoryButtons(msg.Chat.ID)
 		return
@@ -88,15 +107,22 @@ func (df *DownloadFlow) handleWaitingForLinkStep(msg *tgbotapi.Message, state *d
 		// Construct file URL
 		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", df.bot.api.Token, file.FilePath)
 		state.link = fileURL
+		state.linkType = LinkTypeTorrentFile
 		state.step = StepWaitingForCategory
 		df.sendCategoryButtons(msg.Chat.ID)
 		return
 	}
 
 	// Invalid input
-	response.Text = "❌ Please send a valid magnet link or torrent file. I'm here to help you download your content!"
+	response.Text = "❌ Please send a valid magnet link, torrent file, or Rutracker URL. I'm here to help you download your content!"
 	delete(df.States, msg.Chat.ID)
 	df.bot.api.Send(response)
+}
+
+// isRutrackerURL checks if the URL is a rutracker topic URL
+func isRutrackerURL(urlStr string) bool {
+	return strings.Contains(urlStr, "rutracker.org") &&
+		(strings.Contains(urlStr, "viewtopic.php") || strings.Contains(urlStr, "/forum/t/"))
 }
 
 func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, state *downloadState, response tgbotapi.MessageConfig) {
@@ -121,12 +147,31 @@ func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, stat
 	state.category = category
 	state.step = StepDownloading
 
-	// Start the download
-	resp, err := df.bot.coordClient.AddTorrentByMagnet(context.Background(), &coordinatorpb.AddTorrentByMagnetRequest{
-		RequestId:  uuid.New().String(),
-		MagnetLink: state.link,
-		Category:   state.category,
-	})
+	// Start the download based on link type
+	requestID := uuid.New().String()
+	var resp *coordinatorpb.DownloadResponse
+	var err error
+
+	switch state.linkType {
+	case LinkTypeMagnet:
+		resp, err = df.bot.coordClient.AddTorrentByMagnet(context.Background(), &coordinatorpb.AddTorrentByMagnetRequest{
+			RequestId:  requestID,
+			MagnetLink: state.link,
+			Category:   state.category,
+		})
+	case LinkTypeTorrentFile:
+		resp, err = df.bot.coordClient.AddTorrentByFile(context.Background(), &coordinatorpb.AddTorrentByFileRequest{
+			RequestId:  requestID,
+			Base64File: state.link,
+			Category:   state.category,
+		})
+	case LinkTypeRutracker:
+		resp, err = df.bot.coordClient.AddTorrentByRutrackerURL(context.Background(), &coordinatorpb.AddTorrentByRutrackerURLRequest{
+			RequestId:    requestID,
+			RutrackerUrl: state.link,
+			Category:     state.category,
+		})
+	}
 
 	if err != nil {
 		log.Printf("Failed to start download: %v", err)

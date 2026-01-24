@@ -10,9 +10,12 @@ import "common/common-types.proto";
 service CoordinatorService {
   // Add torrent using magnet link
   rpc AddTorrentByMagnet(AddTorrentByMagnetRequest) returns (DownloadResponse) {}
-  
+
   // Add torrent using base64 encoded file
   rpc AddTorrentByFile(AddTorrentByFileRequest) returns (DownloadResponse) {}
+
+  // Add torrent using Rutracker topic URL
+  rpc AddTorrentByRutrackerURL(AddTorrentByRutrackerURLRequest) returns (DownloadResponse) {}
 }
 
 // Request to add torrent using magnet link
@@ -26,6 +29,13 @@ message AddTorrentByMagnetRequest {
 message AddTorrentByFileRequest {
   string request_id = 1;
   string base64_file = 2;
+  common.RequestType category = 3;
+}
+
+// Request to add torrent using Rutracker topic URL
+message AddTorrentByRutrackerURLRequest {
+  string request_id = 1;
+  string rutracker_url = 2;
   common.RequestType category = 3;
 }
 
