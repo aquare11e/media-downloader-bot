@@ -2,8 +2,11 @@ package bot
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -104,9 +107,29 @@ func (df *DownloadFlow) handleWaitingForLinkStep(msg *tgbotapi.Message, state *d
 			return
 		}
 
-		// Construct file URL
+		// Download torrent file from Telegram
 		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", df.bot.api.Token, file.FilePath)
-		state.link = fileURL
+		resp, err := http.Get(fileURL)
+		if err != nil {
+			log.Printf("Failed to download torrent file: %v", err)
+			response.Text = "❌ Oops! I couldn't download your torrent file. Please try again!"
+			delete(df.States, msg.Chat.ID)
+			df.bot.api.Send(response)
+			return
+		}
+		defer resp.Body.Close()
+
+		fileBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("Failed to read torrent file: %v", err)
+			response.Text = "❌ Oops! I couldn't read your torrent file. Please try again!"
+			delete(df.States, msg.Chat.ID)
+			df.bot.api.Send(response)
+			return
+		}
+
+		// Base64 encode the torrent file content
+		state.link = base64.StdEncoding.EncodeToString(fileBytes)
 		state.linkType = LinkTypeTorrentFile
 		state.step = StepWaitingForCategory
 		df.sendCategoryButtons(msg.Chat.ID)
