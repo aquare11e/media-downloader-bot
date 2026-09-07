@@ -6,6 +6,7 @@ const (
 	cartoonsCategory       = "🎨 Cartoons"
 	cartoonsSeriesCategory = "🕸️ Cartoon Series"
 	cartoonsShortsCategory = "🩳 Cartoon Shorts"
+	switchCategory         = "🎮 Switch"
 
 	// Redis related
 	KeyTorrentInProgress     = "bot:torrents:%s"

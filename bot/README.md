@@ -47,7 +47,7 @@ The bot requires the following environment variables to be set:
 
 1. **Start the Download**: The user sends the `/download` command.
 2. **Send Magnet Link or Torrent File**: The bot prompts the user to send a magnet link or a torrent file.
-3. **Select Category**: After receiving a valid input, the bot prompts the user to select a category for the download (e.g., Films, Series, Cartoons).
+3. **Select Category**: After receiving a valid input, the bot prompts the user to select a category for the download (Films, Series, Cartoons, Cartoon Series, Cartoon Shorts, or 🎮 Switch). The `🎮 Switch` category downloads into `SWITCH_DIR_PATH` and skips Plex entirely.
 4. **Download Status Updates**: The bot communicates with the Coordinator service to start the download and provides real-time updates on the download progress.
 
 ## Security Considerations

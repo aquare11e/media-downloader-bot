@@ -23,13 +23,7 @@ func main() {
 	redisURL := getEnvOrRaise("REDIS_URL")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
 
-	pbTypeToDownloadPath := map[common.RequestType]string{
-		common.RequestType_FILMS:           getEnvOrRaise("FILMS_DIR_PATH"),
-		common.RequestType_SERIES:          getEnvOrRaise("SERIES_DIR_PATH"),
-		common.RequestType_CARTOONS:        getEnvOrRaise("CARTOONS_DIR_PATH"),
-		common.RequestType_CARTOONS_SERIES: getEnvOrRaise("CARTOONS_SERIES_DIR_PATH"),
-		common.RequestType_SHORTS:          getEnvOrRaise("SHORTS_DIR_PATH"),
-	}
+	pbTypeToDownloadPath := downloadPathsFromEnv()
 
 	// Create Redis client
 	redisOptions := &redis.Options{
@@ -78,6 +72,19 @@ func main() {
 	go coordinatorService.StartProgressCheckerService(ctx)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+// downloadPathsFromEnv builds the mapping of request type to the directory
+// transmission downloads it into.
+func downloadPathsFromEnv() map[common.RequestType]string {
+	return map[common.RequestType]string{
+		common.RequestType_FILMS:           getEnvOrRaise("FILMS_DIR_PATH"),
+		common.RequestType_SERIES:          getEnvOrRaise("SERIES_DIR_PATH"),
+		common.RequestType_CARTOONS:        getEnvOrRaise("CARTOONS_DIR_PATH"),
+		common.RequestType_CARTOONS_SERIES: getEnvOrRaise("CARTOONS_SERIES_DIR_PATH"),
+		common.RequestType_SHORTS:          getEnvOrRaise("SHORTS_DIR_PATH"),
+		common.RequestType_SWITCH:          getEnvOrRaise("SWITCH_DIR_PATH"),
 	}
 }
 

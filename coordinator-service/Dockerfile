@@ -40,6 +40,7 @@ ENV SERIES_DIR_PATH=""
 ENV CARTOONS_DIR_PATH=""
 ENV CARTOONS_SERIES_DIR_PATH=""
 ENV SHORTS_DIR_PATH=""
+ENV SWITCH_DIR_PATH=""
 
 # Run the application
 CMD ["./coordinator-service"] 

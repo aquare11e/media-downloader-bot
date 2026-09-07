@@ -10,7 +10,6 @@ import (
 
 	common "github.com/aquare11e/media-downloader-bot/common/protogen/common"
 	coordinatorpb "github.com/aquare11e/media-downloader-bot/common/protogen/coordinator"
-	"github.com/aquare11e/media-downloader-bot/common/protogen/plex"
 	"github.com/aquare11e/media-downloader-bot/common/protogen/transmission"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -94,7 +93,7 @@ func (s *Service) checkProgress(ctx context.Context) *time.Duration {
 			}
 
 		case transmission.TorrentStatus_STATUS_DONE:
-			log.Printf("torrent status is done, check plex's library: %s", statusResp.Name)
+			log.Printf("torrent status is done, running post-download action: %s", statusResp.Name)
 			err := s.handleDone(ctx, requestID, statusResp.Name)
 			if err != nil {
 				log.Printf("failed to handle done: %v", err)
@@ -199,23 +198,9 @@ func (s *Service) handleDone(ctx context.Context, requestID string, name string)
 		return err
 	}
 
-	// Refresh Plex library
-	plexReq := &plex.UpdateCategoryRequest{
-		RequestId: requestID,
-		Type:      common.RequestType(categoryInt),
-	}
-
-	var status coordinatorpb.DownloadStatus
-	var message string
-
-	plexResp, err := s.plexClient.UpdateCategory(ctx, plexReq)
-	if err != nil {
-		status, message = coordinatorpb.DownloadStatus_DOWNLOAD_STATUS_ERROR, fmt.Sprintf("Failed to refresh Plex library: %v", err)
-	} else if plexResp.Result == plex.ResponseResult_RESPONSE_RESULT_SUCCESS {
-		status, message = coordinatorpb.DownloadStatus_DOWNLOAD_STATUS_SUCCESS, "✅ Download completed and library refreshed"
-	} else {
-		status, message = coordinatorpb.DownloadStatus_DOWNLOAD_STATUS_ERROR, plexResp.Message
-	}
+	// Run the follow-up action of that category (Plex refresh for media, nothing for SWITCH)
+	requestType := common.RequestType(categoryInt)
+	status, message := s.postDownloadAction(requestType)(ctx, requestID, requestType)
 
 	progressUpdate := &coordinatorpb.DownloadResponse{
 		RequestId: requestID,

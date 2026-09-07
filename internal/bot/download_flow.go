@@ -148,20 +148,29 @@ func isRutrackerURL(urlStr string) bool {
 		(strings.Contains(urlStr, "viewtopic.php") || strings.Contains(urlStr, "/forum/t/"))
 }
 
-func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, state *downloadState, response tgbotapi.MessageConfig) {
-	var category common.RequestType
-	switch msg.Text {
+// categoryFromText maps a category button label to its request type.
+func categoryFromText(text string) (common.RequestType, bool) {
+	switch text {
 	case filmsCategory:
-		category = common.RequestType_FILMS
+		return common.RequestType_FILMS, true
 	case seriesCategory:
-		category = common.RequestType_SERIES
+		return common.RequestType_SERIES, true
 	case cartoonsCategory:
-		category = common.RequestType_CARTOONS
+		return common.RequestType_CARTOONS, true
 	case cartoonsSeriesCategory:
-		category = common.RequestType_CARTOONS_SERIES
+		return common.RequestType_CARTOONS_SERIES, true
 	case cartoonsShortsCategory:
-		category = common.RequestType_SHORTS
+		return common.RequestType_SHORTS, true
+	case switchCategory:
+		return common.RequestType_SWITCH, true
 	default:
+		return common.RequestType_REQUEST_TYPE_UNSPECIFIED, false
+	}
+}
+
+func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, state *downloadState, response tgbotapi.MessageConfig) {
+	category, ok := categoryFromText(msg.Text)
+	if !ok {
 		response.Text = "❌ Please select a valid category from the options below"
 		df.bot.api.Send(response)
 		return
@@ -243,6 +252,7 @@ func (df *DownloadFlow) sendCategoryButtons(chatID int64) {
 		),
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(cartoonsShortsCategory),
+			tgbotapi.NewKeyboardButton(switchCategory),
 		),
 	)
 

@@ -20,6 +20,7 @@ The service requires the following environment variables to be set:
 - `CARTOONS_DIR_PATH`: The directory path for downloaded cartoons.
 - `CARTOONS_SERIES_DIR_PATH`: The directory path for downloaded cartoon series.
 - `SHORTS_DIR_PATH`: The directory path for downloaded shorts.
+- `SWITCH_DIR_PATH`: The directory path for downloaded Nintendo Switch games (served by Ownfoil).
 
 ## Building and Running
 
@@ -35,6 +36,7 @@ The service requires the following environment variables to be set:
    export CARTOONS_DIR_PATH=/path/to/cartoons
    export CARTOONS_SERIES_DIR_PATH=/path/to/cartoon_series
    export SHORTS_DIR_PATH=/path/to/shorts
+   export SWITCH_DIR_PATH=/path/to/switch/library
    ```
 
 2. Build and run the service:
@@ -115,11 +117,20 @@ grpcurl -plaintext -d '{"base64_file": "base64_encoded_torrent_file", "category"
 ```
 
 Where `category` values are:
-- `0` for FILMS
-- `1` for SERIES
-- `2` for CARTOONS
-- `3` for CARTOONS_SERIES
-- `4` for SHORTS
+- `1` for FILMS
+- `2` for SERIES
+- `3` for CARTOONS
+- `4` for CARTOONS_SERIES
+- `5` for SHORTS
+- `6` for SWITCH
+
+## Post-download actions
+
+Once transmission reports a download as done, the coordinator runs the post-download
+action of that category (see `internal/coordinator/post_download.go`):
+
+- media categories (FILMS, SERIES, CARTOONS, CARTOONS_SERIES, SHORTS) → Plex library refresh
+- `SWITCH` → no action; the files sit in `SWITCH_DIR_PATH`, which Ownfoil indexes itself
 
 ## Security Considerations
 

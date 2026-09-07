@@ -11,4 +11,5 @@ enum RequestType {
     CARTOONS = 3;
     CARTOONS_SERIES = 4;
     SHORTS = 5;
+    SWITCH = 6;
 }
