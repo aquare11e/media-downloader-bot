@@ -40,3 +40,33 @@ func TestCategoryFromTextUnknown(t *testing.T) {
 		}
 	}
 }
+
+func TestClassifyText(t *testing.T) {
+	tests := []struct {
+		name   string
+		text   string
+		want   LinkType
+		wantOk bool
+	}{
+		{"magnet link", "magnet:?xt=urn:btih:abc123&dn=Some.Movie", LinkTypeMagnet, true},
+		{"rutracker viewtopic", "https://rutracker.org/forum/viewtopic.php?t=1234567", LinkTypeRutracker, true},
+		{"rutracker short topic", "https://rutracker.org/forum/t/1234567", LinkTypeRutracker, true},
+		{"plain text", "hello there", 0, false},
+		{"empty", "", 0, false},
+		{"http link that is not rutracker", "https://example.com/forum/t/1234567", 0, false},
+		{"rutracker home page", "https://rutracker.org/forum/index.php", 0, false},
+		{"magnet without btih", "magnet:?xt=urn:sha1:abc123", 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := classifyText(tt.text)
+			if ok != tt.wantOk {
+				t.Fatalf("classifyText(%q) recognized = %v, want %v", tt.text, ok, tt.wantOk)
+			}
+			if ok && got != tt.want {
+				t.Errorf("classifyText(%q) = %v, want %v", tt.text, got, tt.want)
+			}
+		})
+	}
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/aquare11e/media-downloader-bot/common/protogen/common"
 )
@@ -38,5 +39,31 @@ func TestDownloadPathsFromEnv(t *testing.T) {
 		if got := paths[requestType]; got != want {
 			t.Errorf("download path for %s: got %q, want %q", requestType, got, want)
 		}
+	}
+}
+
+func TestCheckIntervalFromEnv(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want time.Duration
+	}{
+		{"unset falls back to default", "", defaultCheckInterval},
+		{"valid duration", "10s", 10 * time.Second},
+		{"sub-second duration", "500ms", 500 * time.Millisecond},
+		{"unparsable falls back to default", "soon", defaultCheckInterval},
+		{"bare number falls back to default", "5", defaultCheckInterval},
+		{"zero falls back to default", "0s", defaultCheckInterval},
+		{"negative falls back to default", "-5s", defaultCheckInterval},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(checkIntervalEnv, tt.env)
+
+			if got := checkIntervalFromEnv(); got != tt.want {
+				t.Errorf("checkIntervalFromEnv() with %s=%q: got %s, want %s", checkIntervalEnv, tt.env, got, tt.want)
+			}
+		})
 	}
 }

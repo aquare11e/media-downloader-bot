@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"strconv"
 	"time"
 
@@ -16,14 +15,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	checkInterval = 1 * time.Minute
-)
-
 func (s *Service) StartProgressCheckerService(ctx context.Context) {
-	log.Printf("Starting progress checker service")
+	log.Printf("Starting progress checker service (interval: %s)", s.checkInterval)
 
-	ticker := time.NewTicker(checkInterval)
+	ticker := time.NewTicker(s.checkInterval)
 	defer ticker.Stop()
 
 	for {
@@ -32,30 +27,21 @@ func (s *Service) StartProgressCheckerService(ctx context.Context) {
 			log.Printf("Progress checker service stopped")
 			return
 		case <-ticker.C:
-			for {
-				waitTime := s.checkProgress(ctx)
-				if waitTime != nil && *waitTime < checkInterval {
-					time.Sleep(*waitTime)
-				} else {
-					break
-				}
-			}
+			s.checkProgress(ctx)
 		}
 	}
 }
 
-func (s *Service) checkProgress(ctx context.Context) *time.Duration {
+func (s *Service) checkProgress(ctx context.Context) {
 	requestIDs, err := s.redisClient.SMembers(ctx, KeyTorrentInProgress).Result()
 	if err != nil {
 		log.Printf("failed to get torrent IDs: %v", err)
-		return nil
+		return
 	}
 
 	if len(requestIDs) == 0 {
-		return nil
+		return
 	}
-
-	minEta := int32(math.MaxInt32)
 
 	for _, requestID := range requestIDs {
 		statusResp, err := s.getTorrentStatus(ctx, requestID)
@@ -99,18 +85,7 @@ func (s *Service) checkProgress(ctx context.Context) *time.Duration {
 				log.Printf("failed to handle done: %v", err)
 			}
 		}
-
-		if statusResp.Eta > 0 && statusResp.Eta < minEta {
-			minEta = statusResp.Eta
-		}
 	}
-
-	if minEta == math.MaxInt32 {
-		return nil
-	}
-
-	waitTime := time.Duration(minEta)*time.Second + EtaErrorSeconds*time.Second
-	return &waitTime
 }
 
 func (s *Service) getTorrentStatus(ctx context.Context, requestID string) (*transmission.GetTorrentStatusResponse, error) {

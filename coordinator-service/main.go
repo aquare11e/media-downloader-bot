@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/aquare11e/media-downloader-bot/common/protogen/common"
 	coordinatorpb "github.com/aquare11e/media-downloader-bot/common/protogen/coordinator"
@@ -13,6 +14,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
+)
+
+const (
+	checkIntervalEnv = "CHECK_INTERVAL"
+	// defaultCheckInterval keeps download progress moving at roughly the rate the
+	// bot repaints an open /status message.
+	defaultCheckInterval = 5 * time.Second
 )
 
 func main() {
@@ -24,6 +32,7 @@ func main() {
 	redisPassword := os.Getenv("REDIS_PASSWORD")
 
 	pbTypeToDownloadPath := downloadPathsFromEnv()
+	checkInterval := checkIntervalFromEnv()
 
 	// Create Redis client
 	redisOptions := &redis.Options{
@@ -55,7 +64,7 @@ func main() {
 	defer plexConn.Close()
 
 	// Create coordinator service
-	coordinatorService := coordinator.NewService(transmissionConn, plexConn, redisClient, pbTypeToDownloadPath)
+	coordinatorService := coordinator.NewService(transmissionConn, plexConn, redisClient, pbTypeToDownloadPath, checkInterval)
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
@@ -86,6 +95,29 @@ func downloadPathsFromEnv() map[common.RequestType]string {
 		common.RequestType_SHORTS:          getEnvOrRaise("SHORTS_DIR_PATH"),
 		common.RequestType_SWITCH:          getEnvOrRaise("SWITCH_DIR_PATH"),
 	}
+}
+
+// checkIntervalFromEnv reads how often the progress checker polls transmission.
+// The bot refreshes an open /status message every 2 seconds, so this is what
+// decides whether those refreshes show movement.
+func checkIntervalFromEnv() time.Duration {
+	raw := os.Getenv(checkIntervalEnv)
+	if raw == "" {
+		return defaultCheckInterval
+	}
+
+	interval, err := time.ParseDuration(raw)
+	if err != nil {
+		log.Printf("Invalid %s value %q, falling back to %s: %v", checkIntervalEnv, raw, defaultCheckInterval, err)
+		return defaultCheckInterval
+	}
+
+	if interval <= 0 {
+		log.Printf("%s must be positive, got %s, falling back to %s", checkIntervalEnv, interval, defaultCheckInterval)
+		return defaultCheckInterval
+	}
+
+	return interval
 }
 
 func getEnvOrRaise(key string) string {

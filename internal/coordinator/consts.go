@@ -14,6 +14,4 @@ const (
 	StaleThreshold = 10 * time.Minute
 	// CheckInterval is how often the recovery service checks for stale records
 	CheckInterval = 1 * time.Minute
-	// EtaErrorSeconds is the number of seconds to add to ETA (because download is not always accurate)
-	EtaErrorSeconds = 10
 )

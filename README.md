@@ -76,6 +76,10 @@ stack like Transmission and Plex: it serves the Nintendo Switch library and inde
 - `REDIS_PASSWORD`: Redis password
 - `*_DIR_PATH`: Paths for different media types
 - `SWITCH_DIR_PATH`: Download directory of the `SWITCH` category (see [Switch downloads](#switch-downloads))
+- `CHECK_INTERVAL`: How often transmission is polled for download progress, as a Go duration
+  (`5s`, `10s`). Optional, defaults to `5s`. This is the ceiling on how fresh `/status` can be:
+  the bot repaints an open status message every 2 seconds, but the numbers only move when a poll
+  finds something new. An unparsable or non-positive value falls back to the default with a log line.
 
 ### Plex Service
 - `SERVICE_PORT`: gRPC service port
@@ -179,10 +183,14 @@ The two stacks share one directory, so their UIDs have to agree:
 
 ## Usage
 
+Send the bot a magnet link, a `.torrent` file, or a Rutracker topic URL and it will ask which
+category to file it under and start the download. No command needed - `/download` only exists to
+prompt you for the link first.
+
 1. Start a conversation with your Telegram bot
 2. Send `/start` to begin
 3. Available commands:
-   - `/download` - Start a download (categories: Films, Series, Cartoons, Cartoon Series, Cartoon Shorts, 🎮 Switch)
+   - `/download` - Ask for a link, then start a download (categories: Films, Series, Cartoons, Cartoon Series, Cartoon Shorts, 🎮 Switch)
    - `/status` - Check the current status of ongoing downloads. The list and the per-download
      details refresh themselves every 2 seconds; auto-refresh pauses after 5 minutes of
      inactivity and resumes on the next button tap

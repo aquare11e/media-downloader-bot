@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -63,83 +64,89 @@ func (df *DownloadFlow) Start(chatID int64) {
 func (df *DownloadFlow) HandleMessage(msg *tgbotapi.Message) {
 	response := tgbotapi.NewMessage(msg.Chat.ID, "")
 
-	if state, exists := df.States[msg.Chat.ID]; exists {
-		switch state.step {
-		case StepWaitingForLink:
-			df.handleWaitingForLinkStep(msg, state, response)
-		case StepWaitingForCategory:
-			df.handleWaitingForCategoryStep(msg, state, response)
-		}
-	} else {
-		response.Text = "Please use /download command to start a new download"
-		df.bot.api.Send(response)
+	// The category keyboard is the only step that needs the previous message for
+	// context. Everything else - including a link dropped without /download - is
+	// the start of a new download.
+	if state, exists := df.States[msg.Chat.ID]; exists && state.step == StepWaitingForCategory {
+		df.handleWaitingForCategoryStep(msg, state, response)
+		return
 	}
+
+	df.startFromMessage(msg, response)
 }
 
-func (df *DownloadFlow) handleWaitingForLinkStep(msg *tgbotapi.Message, state *downloadState, response tgbotapi.MessageConfig) {
-	// Check if it's a magnet link
-	if strings.HasPrefix(msg.Text, "magnet:?xt=urn:btih:") {
-		state.link = msg.Text
-		state.linkType = LinkTypeMagnet
-		state.step = StepWaitingForCategory
-		df.sendCategoryButtons(msg.Chat.ID)
+// startFromMessage begins a download from whatever the user sent, whether or not
+// they went through /download first.
+func (df *DownloadFlow) startFromMessage(msg *tgbotapi.Message, response tgbotapi.MessageConfig) {
+	link, linkType, ok, err := df.detectLink(msg)
+	if err != nil {
+		response.Text = err.Error()
+		delete(df.States, msg.Chat.ID)
+		df.bot.api.Send(response)
 		return
 	}
 
-	// Check if it's a Rutracker URL
-	if isRutrackerURL(msg.Text) {
-		state.link = msg.Text
-		state.linkType = LinkTypeRutracker
-		state.step = StepWaitingForCategory
-		df.sendCategoryButtons(msg.Chat.ID)
+	if !ok {
+		response.Text = "📥 Send me a magnet link, a .torrent file, or a Rutracker URL and I'll start the download right away. Use /help to see all commands."
+		delete(df.States, msg.Chat.ID)
+		df.bot.api.Send(response)
 		return
 	}
 
-	// Check if it's a document (torrent file)
-	if msg.Document != nil && strings.HasSuffix(msg.Document.FileName, ".torrent") {
-		// Get file info
-		file, err := df.bot.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
-		if err != nil {
-			log.Printf("Failed to get file info: %v", err)
-			response.Text = "❌ Oops! I couldn't process your torrent file. Please try again!"
-			delete(df.States, msg.Chat.ID)
-			df.bot.api.Send(response)
-			return
-		}
+	df.States[msg.Chat.ID] = &downloadState{
+		step:     StepWaitingForCategory,
+		link:     link,
+		linkType: linkType,
+	}
+	df.sendCategoryButtons(msg.Chat.ID)
+}
 
-		// Download torrent file from Telegram
-		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", df.bot.api.Token, file.FilePath)
-		resp, err := http.Get(fileURL)
-		if err != nil {
-			log.Printf("Failed to download torrent file: %v", err)
-			response.Text = "❌ Oops! I couldn't download your torrent file. Please try again!"
-			delete(df.States, msg.Chat.ID)
-			df.bot.api.Send(response)
-			return
-		}
-		defer resp.Body.Close()
-
-		fileBytes, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("Failed to read torrent file: %v", err)
-			response.Text = "❌ Oops! I couldn't read your torrent file. Please try again!"
-			delete(df.States, msg.Chat.ID)
-			df.bot.api.Send(response)
-			return
-		}
-
-		// Base64 encode the torrent file content
-		state.link = base64.StdEncoding.EncodeToString(fileBytes)
-		state.linkType = LinkTypeTorrentFile
-		state.step = StepWaitingForCategory
-		df.sendCategoryButtons(msg.Chat.ID)
-		return
+// detectLink resolves a message into a download link and its type. ok is false
+// when the message is not a download request at all; err carries a
+// user-facing message when a torrent file was sent but could not be read.
+func (df *DownloadFlow) detectLink(msg *tgbotapi.Message) (string, LinkType, bool, error) {
+	if linkType, ok := classifyText(msg.Text); ok {
+		return msg.Text, linkType, true, nil
 	}
 
-	// Invalid input
-	response.Text = "❌ Please send a valid magnet link, torrent file, or Rutracker URL. I'm here to help you download your content!"
-	delete(df.States, msg.Chat.ID)
-	df.bot.api.Send(response)
+	if msg.Document == nil || !strings.HasSuffix(msg.Document.FileName, ".torrent") {
+		return "", 0, false, nil
+	}
+
+	file, err := df.bot.api.GetFile(tgbotapi.FileConfig{FileID: msg.Document.FileID})
+	if err != nil {
+		log.Printf("Failed to get file info: %v", err)
+		return "", 0, false, errors.New("❌ Oops! I couldn't process your torrent file. Please try again!")
+	}
+
+	// Download torrent file from Telegram
+	fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", df.bot.api.Token, file.FilePath)
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		log.Printf("Failed to download torrent file: %v", err)
+		return "", 0, false, errors.New("❌ Oops! I couldn't download your torrent file. Please try again!")
+	}
+	defer resp.Body.Close()
+
+	fileBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read torrent file: %v", err)
+		return "", 0, false, errors.New("❌ Oops! I couldn't read your torrent file. Please try again!")
+	}
+
+	return base64.StdEncoding.EncodeToString(fileBytes), LinkTypeTorrentFile, true, nil
+}
+
+// classifyText reports which kind of download link the text is, if any.
+func classifyText(text string) (LinkType, bool) {
+	switch {
+	case strings.HasPrefix(text, "magnet:?xt=urn:btih:"):
+		return LinkTypeMagnet, true
+	case isRutrackerURL(text):
+		return LinkTypeRutracker, true
+	default:
+		return 0, false
+	}
 }
 
 // isRutrackerURL checks if the URL is a rutracker topic URL
@@ -171,6 +178,13 @@ func categoryFromText(text string) (common.RequestType, bool) {
 func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, state *downloadState, response tgbotapi.MessageConfig) {
 	category, ok := categoryFromText(msg.Text)
 	if !ok {
+		// A link sent while the keyboard is up replaces the pending one rather
+		// than being rejected as an invalid category.
+		if _, isLink := classifyText(msg.Text); isLink || msg.Document != nil {
+			df.startFromMessage(msg, response)
+			return
+		}
+
 		response.Text = "❌ Please select a valid category from the options below"
 		df.bot.api.Send(response)
 		return

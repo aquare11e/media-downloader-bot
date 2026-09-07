@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	common "github.com/aquare11e/media-downloader-bot/common/protogen/common"
 	coordinatorpb "github.com/aquare11e/media-downloader-bot/common/protogen/coordinator"
@@ -22,15 +23,17 @@ type Service struct {
 	redisClient          *redis.Client
 	pbTypeToDownloadPath map[common.RequestType]string
 	rutrackerClient      *RutrackerClient
+	checkInterval        time.Duration
 }
 
-func NewService(transmissionConn, plexConn *grpc.ClientConn, redisClient *redis.Client, pbTypeToDownloadPath map[common.RequestType]string) *Service {
+func NewService(transmissionConn, plexConn *grpc.ClientConn, redisClient *redis.Client, pbTypeToDownloadPath map[common.RequestType]string, checkInterval time.Duration) *Service {
 	return &Service{
 		transmissionClient:   transmission.NewTransmissionServiceClient(transmissionConn),
 		plexClient:           plex.NewPlexServiceClient(plexConn),
 		redisClient:          redisClient,
 		pbTypeToDownloadPath: pbTypeToDownloadPath,
 		rutrackerClient:      NewRutrackerClient(),
+		checkInterval:        checkInterval,
 	}
 }
 
