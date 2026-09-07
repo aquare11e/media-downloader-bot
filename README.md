@@ -183,7 +183,9 @@ The two stacks share one directory, so their UIDs have to agree:
 2. Send `/start` to begin
 3. Available commands:
    - `/download` - Start a download (categories: Films, Series, Cartoons, Cartoon Series, Cartoon Shorts, 🎮 Switch)
-   - `/status` - Check the current status of ongoing downloads
+   - `/status` - Check the current status of ongoing downloads. The list and the per-download
+     details refresh themselves every 2 seconds; auto-refresh pauses after 5 minutes of
+     inactivity and resumes on the next button tap
    - `/help` - Get a list of available commands and their descriptions
 
 ## License
