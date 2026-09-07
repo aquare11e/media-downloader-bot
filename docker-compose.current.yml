@@ -1,6 +1,6 @@
 services:
   bot:
-    image: ghcr.io/aquare11e/media-downloader-bot/bot:v1.2.0
+    image: ghcr.io/aquare11e/media-downloader-bot/bot:v1.3.0
     restart: unless-stopped
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -15,7 +15,7 @@ services:
       - coordinator
 
   coordinator:
-    image: ghcr.io/aquare11e/media-downloader-bot/coordinator:v1.2.0
+    image: ghcr.io/aquare11e/media-downloader-bot/coordinator:v1.3.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8001
@@ -27,6 +27,7 @@ services:
       - CARTOONS_SERIES_DIR_PATH=${CARTOONS_SERIES_DIR_PATH}
       - SHORTS_DIR_PATH=${SHORTS_DIR_PATH}
       - SWITCH_DIR_PATH=${SWITCH_DIR_PATH}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-5s}
       - PLEX_SERVICE_URL=plex:8002
       - TRANSMISSION_SERVICE_URL=transmission:8003
     networks:
@@ -37,7 +38,7 @@ services:
       - transmission
 
   plex:
-    image: ghcr.io/aquare11e/media-downloader-bot/plex:v1.2.0
+    image: ghcr.io/aquare11e/media-downloader-bot/plex:v1.3.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8002
@@ -53,7 +54,7 @@ services:
       - media-downloader
 
   transmission:
-    image: ghcr.io/aquare11e/media-downloader-bot/transmission:v1.2.0
+    image: ghcr.io/aquare11e/media-downloader-bot/transmission:v1.3.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8003
