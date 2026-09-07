@@ -1,6 +1,6 @@
 services:
   bot:
-    image: ghcr.io/aquare11e/media-downloader-bot/bot:v1.1.5
+    image: ghcr.io/aquare11e/media-downloader-bot/bot:v1.2.0
     restart: unless-stopped
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
@@ -15,7 +15,7 @@ services:
       - coordinator
 
   coordinator:
-    image: ghcr.io/aquare11e/media-downloader-bot/coordinator:v1.1.5
+    image: ghcr.io/aquare11e/media-downloader-bot/coordinator:v1.2.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8001
@@ -37,7 +37,7 @@ services:
       - transmission
 
   plex:
-    image: ghcr.io/aquare11e/media-downloader-bot/plex:v1.1.5
+    image: ghcr.io/aquare11e/media-downloader-bot/plex:v1.2.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8002
@@ -53,7 +53,7 @@ services:
       - media-downloader
 
   transmission:
-    image: ghcr.io/aquare11e/media-downloader-bot/transmission:v1.1.5
+    image: ghcr.io/aquare11e/media-downloader-bot/transmission:v1.2.0
     restart: unless-stopped
     environment:
       - SERVICE_PORT=8003
