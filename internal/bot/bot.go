@@ -84,8 +84,9 @@ func (b *Bot) Start() {
 		}
 	}
 
-	// Stop the queue processor when the bot stops
+	// Stop the background workers when the bot stops
 	b.queueProcessor.Stop()
+	b.statusChecker.StopAll()
 }
 
 func (b *Bot) handleCommand(msg *tgbotapi.Message) {

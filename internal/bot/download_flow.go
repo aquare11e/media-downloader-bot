@@ -221,7 +221,9 @@ func (df *DownloadFlow) handleWaitingForCategoryStep(msg *tgbotapi.Message, stat
 		Progress: resp.Progress,
 	}
 
-	err1 := df.bot.redisClient.HSet(context.Background(), fmt.Sprintf(KeyTorrentInProgress, resp.RequestId), status.ToRedisMap()).Err()
+	statusKey := fmt.Sprintf(KeyTorrentInProgress, resp.RequestId)
+	err1 := df.bot.redisClient.HSet(context.Background(), statusKey, status.ToRedisMap()).Err()
+	df.bot.redisClient.Expire(context.Background(), statusKey, statusTTL)
 	err2 := df.bot.redisClient.SAdd(context.Background(), KeyTorrentInProgressKeys, resp.RequestId).Err()
 	err3 := df.bot.redisClient.Set(context.Background(), fmt.Sprintf(KeyTorrentDownloadOwner, resp.RequestId), msg.Chat.ID, 24*time.Hour).Err()
 	if err1 != nil || err2 != nil || err3 != nil {
